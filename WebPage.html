@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+
+<style>
+
+.states {
+  fill: #ffdd99;
+}
+
+.state-borders {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.5px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.Network-arcs {
+  display: none;
+  fill: none;
+  stroke: #000;
+}
+
+.Network circle {
+  fill: #008000;
+  stroke: #fff;
+  pointer-events: all;
+}
+
+.Depot:hover .Network-arcs {
+  display: inline;
+}
+
+}
+
+</style>
+
+
+<body>
+
+  <h2>
+      <span></span> </br>
+      Delivery Network
+    </h2>
+
+
+<script src="//d3js.org/d3.v3.min.js"></script>
+<script src="//d3js.org/queue.v1.min.js"></script>
+<script src="//d3js.org/topojson.v1.min.js"></script>
+<script>
+
+var width = 960,
+    height = 500;
+
+var projection = d3.geo.albers()
+    .translate([width / 2, height / 2])
+    .scale(1080);
+
+var path = d3.geo.path()
+    .projection(projection);
+
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+queue()
+    .defer(d3.json, "us.json")
+	.defer(d3.csv, "RouteOrigins.csv")	
+    .defer(d3.csv, "DataForAnalysis.csv")
+    .await(ready);
+
+function ready(error, us, RouteOrigins, data) {
+  if (error) throw error;
+
+		var OriginbyId = d3.map(), 
+		positions = [], 
+		newarray = [];
+		
+		RouteOrigins.forEach(function(d){
+			d.Origin_Lat = +d.Origin_Lat;
+			d.Origin_Long = +d.Origin_Long;
+			d[0] = +d.Origin_Long;
+			d[1] = +d.Origin_Lat;
+			var position = projection(d);
+			d.x = position[0];
+			d.y = position[1];
+				
+			OriginbyId.set(d.Route_Origin_Location_Description, d);
+			d.outgoing = [];
+
+
+		});
+			
+		data.forEach(function(d){
+			d.Location_Lat = +d.Location_Lat;
+			d.Location_Long = +d.Location_Long;
+			d.Origin_Lat = +d.Origin_Lat;
+			d.Origin_Long = +d.Origin_Long;
+			d[0] = +d.Location_Long;
+			d[1] = +d.Location_Lat;
+			
+			var source = OriginbyId.get(d.Route_Origin_Location_Description); 
+			var target = d;
+			var link = {source: source, target: target};
+			
+			if (source)
+			{
+			source.outgoing.push(link);
+			}
+			
+		});
+		
+		
+		
+svg.append("path")
+      .datum(topojson.feature(us, us.objects.land))
+      .attr("class", "states")
+      .attr("d", path);
+
+	
+svg.append("path")
+      .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
+      .attr("class", "state-borders")
+      .attr("d", path);
+
+	   
+var Network = svg.append("g")
+      .attr("class", "Network")
+    .selectAll("g")
+      .data(RouteOrigins)
+    .enter().append("g")
+      .attr("class", "Depot")
+	
+	  
+ Network.append("g")
+      .attr("class", "Network-arcs")
+    .selectAll("path")
+      .data(function(d) { return d.outgoing; })
+    .enter().append("path")
+      .attr("d", function(d) { return path({type: "LineString", coordinates: [d.source, d.target]}); });
+	
+	
+	  Network.append("circle")
+      .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
+      .attr("r", 3)
+	    .on("mouseover", function(d, i) { d3.select("h2 span").text(d.Route_Origin_Location_Description); });
+	  
+
+
+
+	  
+}
+
+</script>
